@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calcolo Ore & Straordinari</title>
+<style>
+  :root{
+    --bg:#0b0b0d;
+    --card:#15161a;
+    --ink:#f6f7fb;
+    --muted:#a9afc0;
+    --accent:#ff3b30; /* iOS red */
+    --ok:#34c759;     /* iOS green */
+    --input:#1e2026;
+    --border:#2a2d36;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;line-height:1.35}
+  header{padding:18px 16px 0;position:sticky;top:0;background:linear-gradient(180deg,var(--bg),rgba(11,11,13,.85) 70%,rgba(11,11,13,0))}
+  h1{font-size:1.3rem;margin:0 0 6px 0}
+  .sub{color:var(--muted);font-size:.9rem;margin:0 0 12px 0}
+  main{padding:12px 16px 40px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 1px 0 rgba(0,0,0,.5)}
+  label{display:block;font-size:.9rem;margin:10px 0 6px;color:var(--muted)}
+  input[type="text"], input[type="time"]{
+    width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input);color:var(--ink);
+    font-size:1.05rem;outline:none;
+  }
+  .row{display:flex;gap:10px}
+  .row > div{flex:1}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  button{
+    appearance:none;border:none;border-radius:12px;padding:12px 14px;font-weight:600;cursor:pointer;
+    background:var(--input);color:var(--ink);border:1px solid var(--border)
+  }
+  button.primary{background:var(--ok);color:#000;border:none}
+  button.danger{background:var(--accent);color:#fff;border:none}
+  button.ghost{background:transparent}
+  .pill{display:inline-block;background:#1f2330;border:1px solid var(--border);padding:6px 10px;border-radius:999px;color:var(--muted);font-size:.85rem}
+  .result{font-size:1.1rem}
+  .result strong{font-size:1.3rem}
+  .muted{color:var(--muted)}
+  hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:.95rem}
+  th{color:var(--muted);font-weight:600}
+  footer{padding:20px;color:var(--muted);font-size:.85rem;text-align:center}
+  .hint{font-size:.8rem;color:var(--muted);margin-top:4px}
+  .badge{padding:2px 8px;border-radius:999px;background:#162d19;color:#7ff19a;border:1px solid #234a2a;font-size:.8rem}
+  .error{color:#ff8a80}
+</style>
+</head>
+<body>
+<header>
+  <h1>Calcolo Ore & Straordinari</h1>
+  <p class="sub">Funziona 100% offline. Salva questa pagina nei File e aprila su iPhone.</p>
+</header>
+
+<main>
+  <div class="card">
+    <div class="pill">Formato orario: <b>HH:MM</b>. Accetta anche <b>07,00</b> o <b>7.00</b>.</div>
+    <div class="row">
+      <div>
+        <label for="start">Entrata</label>
+        <input id="start" type="text" inputmode="numeric" placeholder="07:00">
+      </div>
+      <div>
+        <label for="end">Uscita</label>
+        <input id="end" type="text" inputmode="numeric" placeholder="17:30">
+      </div>
+    </div>
+    <div id="pauses">
+      <div class="row pause-row">
+        <div>
+          <label>Pausa da</label>
+          <input type="text" class="pause-start" inputmode="numeric" placeholder="12:30">
+        </div>
+        <div>
+          <label>a</label>
+          <input type="text" class="pause-end" inputmode="numeric" placeholder="13:30">
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="standard">Ore ordinarie (contratto)</label>
+        <input id="standard" type="text" inputmode="numeric" value="08:00">
+        <div class="hint">Lo straordinario = lavorate − ordinarie (min 0).</div>
+      </div>
+      <div>
+        <label for="giorno">Data (facoltativa)</label>
+        <input id="giorno" type="text" placeholder="es. 30/09/2025">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="calcBtn">Calcola</button>
+      <button id="addPause">+ Aggiungi pausa</button>
+      <button id="saveBtn">Salva riga</button>
+      <button class="ghost" id="clearBtn">Azzera campi</button>
+    </div>
+    <div id="error" class="error" style="margin-top:8px"></div>
+    <hr>
+    <div class="result" id="result">
+      Ore lavorate: <strong>—</strong><br>
+      Straordinario: <strong>—</strong> <span class="muted">(oltre le ordinarie)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="pill">Storico locale</div>
+      <div style="margin-left:auto">
+        <button id="exportBtn">Esporta CSV</button>
+        <button class="danger" id="wipeBtn">Svuota storico</button>
+      </div>
+    </div>
+    <table id="logTable" aria-label="Storico">
+      <thead>
+        <tr><th>Data</th><th>Entrata</th><th>Uscita</th><th>Pausa</th><th>Lavorate</th><th>Straordinario</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <footer>
+    Suggerimento: su iPhone apri questo file in <b>Safari</b>, poi <b>Condividi → Aggiungi alla Home</b> per un accesso rapido.
+  </footer>
+</main>
+
+<script>
+  // Helpers
+  function toMinutes(str){
+    if(!str) return NaN;
+    str = (str+'').trim().replace(/,/g,':').replace(/\./g,':');
+    // allow 700 -> 07:00
+    if(/^[0-2]?\d[0-5]\d$/.test(str)){ str = str.padStart(4,'0'); str = str.slice(0,2)+':'+str.slice(2); }
+    const m = str.match(/^(\d{1,2}):(\d{2})$/);
+    if(!m) return NaN;
+    let h = parseInt(m[1],10), min = parseInt(m[2],10);
+    if(h<0||h>47||min<0||min>59) return NaN;
+    return h*60+min;
+  }
+  function fromMinutes(mins){
+    mins = Math.max(0, Math.round(mins));
+    const h = Math.floor(mins/60);
+    const m = mins%60;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+  }
+  function diffMinutes(start,end){
+    // supports overnight: if end < start, assume next day
+    if(end < start) end += 24*60;
+    return end - start;
+  }
+
+  function totalBreakMinutes(){
+    const rows = document.querySelectorAll('.pause-row');
+    let tot=0;
+    for(const row of rows){
+      const a = toMinutes(row.querySelector('.pause-start').value);
+      const b = toMinutes(row.querySelector('.pause-end').value);
+      if(isNaN(a) && isNaN(b)) continue; // empty
+      if(isNaN(a) || isNaN(b)) throw new Error('Compila sia inizio che fine pausa.');
+      if(b===a) continue;
+      tot += diffMinutes(a,b);
+    }
+    return tot;
+  }
+
+  function calc(){
+    const err = document.getElementById('error'); err.textContent='';
+    const start = toMinutes(document.getElementById('start').value);
+    const end = toMinutes(document.getElementById('end').value);
+    const standard = toMinutes(document.getElementById('standard').value);
+    if(isNaN(start) || isNaN(end)) { err.textContent='Controlla entrata/uscita. Usa formato HH:MM (es. 07:00).'; return null; }
+    if(isNaN(standard)) { err.textContent='Ore ordinarie non valide.'; return null; }
+    let worked = diffMinutes(start,end);
+    try{
+      const pause = totalBreakMinutes();
+      if(pause>worked){ err.textContent='Le pause non possono superare il tempo di lavoro.'; return null; }
+      worked -= pause;
+    }catch(e){
+      err.textContent = e.message; return null;
+    }
+    const overtime = Math.max(0, worked - standard);
+    const res = document.getElementById('result');
+    res.innerHTML = 'Ore lavorate: <strong>'+fromMinutes(worked)+'</strong><br>Straordinario: <strong>'+fromMinutes(overtime)+'</strong> <span class="muted">(oltre le ordinarie)</span>';
+    // persist last inputs
+    localStorage.setItem('calc_last', JSON.stringify(readForm()));
+    return {worked, overtime};
+  }
+
+  function readForm(){
+    const pauses = [];
+    document.querySelectorAll('.pause-row').forEach(row=>{
+      pauses.push({a:row.querySelector('.pause-start').value,b:row.querySelector('.pause-end').value});
+    });
+    return {
+      giorno: document.getElementById('giorno').value,
+      start: document.getElementById('start').value,
+      end: document.getElementById('end').value,
+      standard: document.getElementById('standard').value,
+      pauses
+    };
+  }
+  function writeForm(data){
+    document.getElementById('giorno').value = data.giorno||'';
+    document.getElementById('start').value = data.start||'';
+    document.getElementById('end').value = data.end||'';
+    document.getElementById('standard').value = data.standard||'08:00';
+    const wrap = document.getElementById('pauses');
+    wrap.innerHTML='';
+    (data.pauses && data.pauses.length? data.pauses : [{a:'',b:''}]).forEach(p=>addPauseRow(p.a,p.b));
+  }
+  function addPauseRow(a='',b=''){
+    const wrap = document.getElementById('pauses');
+    const row = document.createElement('div');
+    row.className='row pause-row';
+    row.innerHTML = '<div><label>Pausa da</label><input type="text" class="pause-start" inputmode="numeric" placeholder="12:30"></div><div><label>a</label><input type="text" class="pause-end" inputmode="numeric" placeholder="13:30"></div>';
+    wrap.appendChild(row);
+    row.querySelector('.pause-start').value=a;
+    row.querySelector('.pause-end').value=b;
+    return row;
+  }
+
+  function saveRow(){
+    const r = calc();
+    if(!r) return;
+    const data = readForm();
+    const pauseTxt = data.pauses.map(p=> (p.a && p.b)? p.a+'–'+p.b : '').filter(Boolean).join(', ');
+    const row = {
+      giorno: data.giorno || new Date().toLocaleDateString('it-IT'),
+      start: data.start, end: data.end, pause: pauseTxt || '—',
+      worked: fromMinutes(r.worked), overtime: fromMinutes(r.overtime),
+      ts: Date.now()
+    };
+    const log = JSON.parse(localStorage.getItem('calc_log')||'[]');
+    log.push(row);
+    localStorage.setItem('calc_log', JSON.stringify(log));
+    renderLog();
+  }
+
+  function renderLog(){
+    const tbody = document.querySelector('#logTable tbody');
+    const log = JSON.parse(localStorage.getItem('calc_log')||'[]');
+    log.sort((a,b)=>a.ts-b.ts); // oldest first
+    tbody.innerHTML = log.map(r=>'<tr><td>'+escapeHtml(r.giorno)+'</td><td>'+escapeHtml(r.start)+'</td><td>'+escapeHtml(r.end)+'</td><td>'+escapeHtml(r.pause)+'</td><td>'+escapeHtml(r.worked)+'</td><td>'+escapeHtml(r.overtime)+'</td></tr>').join('');
+  }
+
+  function exportCSV(){
+    const log = JSON.parse(localStorage.getItem('calc_log')||'[]');
+    if(!log.length){ alert('Nessun dato da esportare.'); return; }
+    const rows = [['Data','Entrata','Uscita','Pausa','Lavorate','Straordinario']]
+      .concat(log.map(r=>[r.giorno,r.start,r.end,r.pause,r.worked,r.overtime]));
+    const csv = rows.map(r=>r.map(field=>('"'+String(field).replace(/"/g,'""')+'"')).join(';')).join('\n');
+    const blob = new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'storico_ore.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearInputs(){
+    writeForm({});
+    document.getElementById('result').innerHTML = 'Ore lavorate: <strong>—</strong><br>Straordinario: <strong>—</strong> <span class="muted">(oltre le ordinarie)</span>';
+    document.getElementById('error').textContent='';
+  }
+
+  function wipeLog(){
+    if(confirm('Sicuro di voler cancellare lo storico?')){
+      localStorage.removeItem('calc_log');
+      renderLog();
+    }
+  }
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // Events
+  document.getElementById('calcBtn').addEventListener('click', calc);
+  document.getElementById('addPause').addEventListener('click', e=>{ e.preventDefault(); addPauseRow(); });
+  document.getElementById('saveBtn').addEventListener('click', e=>{ e.preventDefault(); saveRow(); });
+  document.getElementById('exportBtn').addEventListener('click', e=>{ e.preventDefault(); exportCSV(); });
+  document.getElementById('clearBtn').addEventListener('click', e=>{ e.preventDefault(); clearInputs(); });
+  document.getElementById('wipeBtn').addEventListener('click', e=>{ e.preventDefault(); wipeLog(); });
+
+  // Restore last state
+  (function init(){
+    try{
+      const last = JSON.parse(localStorage.getItem('calc_last')||'{}');
+      writeForm(last);
+      renderLog();
+      if(last.start && last.end) calc();
+    }catch(e){}
+  })();
+</script>
+</body>
+</html>
